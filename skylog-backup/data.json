@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-09-02T13:50:42.717Z",
+  "exportedAt": "2026-09-02T13:52:03.493Z",
   "jumps": [
     {
       "id": "2b36bda7-ea54-499e-bbf6-7005408edfc8",
@@ -1280,6 +1280,66 @@
       "created_at": "2026-06-30T12:13:41.874758+00:00",
       "updated_at": "2026-06-30T12:13:41.874758+00:00",
       "altitude": 13000
+    },
+    {
+      "id": "c46b0155-2788-457a-92c4-3dce08aca874",
+      "created_at": "2026-09-02T13:51:01.327Z",
+      "date": "2026-07-04",
+      "jump_number_start": 1370,
+      "jump_number_end": 1371,
+      "number_of_jumps": 2,
+      "location": "Vancouver",
+      "event_name": "Bombshell boogie",
+      "jump_type": "FF Outside video",
+      "notes": null,
+      "altitude": 14000,
+      "gear_snapshot": {
+        "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
+        "mainCanopyLabel": "Sabre 2 107",
+        "linesetId": "1287198c-2b11-43d7-80c2-b6bb8cf0f2cb",
+        "linesetLabel": "Test lineset 1"
+      },
+      "per_jump_notes": {}
+    },
+    {
+      "id": "111a9606-0d52-4cfa-9386-0a406900cb60",
+      "created_at": "2026-09-02T13:51:18.552Z",
+      "date": "2026-07-05",
+      "jump_number_start": 1372,
+      "jump_number_end": 1376,
+      "number_of_jumps": 5,
+      "location": "Vancouver",
+      "event_name": "Bombshell boogie",
+      "jump_type": "FF Outside video",
+      "notes": null,
+      "altitude": 14000,
+      "gear_snapshot": {
+        "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
+        "mainCanopyLabel": "Sabre 2 107",
+        "linesetId": "1287198c-2b11-43d7-80c2-b6bb8cf0f2cb",
+        "linesetLabel": "Test lineset 1"
+      },
+      "per_jump_notes": {}
+    },
+    {
+      "id": "38153798-2d86-4fe7-9cad-0930ef368904",
+      "created_at": "2026-09-02T13:51:35.181Z",
+      "date": "2026-07-06",
+      "jump_number_start": 1377,
+      "jump_number_end": 1379,
+      "number_of_jumps": 3,
+      "location": "Vancouver",
+      "event_name": "Bombshell boogie",
+      "jump_type": "FF Outside video",
+      "notes": null,
+      "altitude": 14000,
+      "gear_snapshot": {
+        "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
+        "mainCanopyLabel": "Sabre 2 107",
+        "linesetId": "1287198c-2b11-43d7-80c2-b6bb8cf0f2cb",
+        "linesetLabel": "Test lineset 1"
+      },
+      "per_jump_notes": {}
     }
   ],
   "gear_items": [
@@ -1624,6 +1684,16 @@
       "id": "d5d844d3-4e37-437a-9597-f28fee97aefd",
       "category": "location",
       "value": "Vancouver"
+    },
+    {
+      "id": "8268bbc3-068d-4dd8-a0f1-919e4397e287",
+      "category": "event_name",
+      "value": "Bombshell boogie"
+    },
+    {
+      "id": "d63469c0-f2a9-472a-882c-1ced50766a43",
+      "category": "location",
+      "value": "Bovec"
     }
   ],
   "settings": {

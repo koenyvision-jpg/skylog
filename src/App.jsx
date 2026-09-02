@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import { useSupabase } from './hooks/useSupabase'
 import { useAlerts } from './hooks/useAlerts'
-import { useOfflineQueue } from './hooks/useOfflineQueue'
 import { getSettings } from './lib/db'
-import LoginPage from './pages/LoginPage'
+import { hasLocalData, isGithubConfigured, restoreFromGithub } from './lib/githubBackup'
 import LogPage from './pages/LogPage'
 import LogbookPage from './pages/LogbookPage'
 import GearPage from './pages/GearPage'
@@ -15,30 +13,31 @@ import BottomNav from './components/BottomNav'
 import AIAssistant from './components/AIAssistant'
 
 export default function App() {
-  const { session, loading, signInWithGoogle, signOut } = useSupabase()
+  const [ready, setReady] = useState(false)
   const [activeTab, setActiveTab] = useState('log')
   const [gearClosetCategory, setGearClosetCategory] = useState(null)
   const [settings, setSettings] = useState(null)
   const [logPrefill, setLogPrefill] = useState(null)
-  const { isOnline } = useOfflineQueue()
   const { alerts, criticalCount } = useAlerts(settings)
 
   useEffect(() => {
-    if (session) {
-      getSettings().then(s => setSettings(s)).catch(() => {})
+    const init = async () => {
+      if (!hasLocalData() && isGithubConfigured()) {
+        try { await restoreFromGithub() } catch { /* fall through to empty state */ }
+      }
+      const s = await getSettings().catch(() => null)
+      setSettings(s)
+      setReady(true)
     }
-  }, [session])
+    init()
+  }, [])
 
-  if (loading) {
+  if (!ready) {
     return (
       <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div className="spinner" />
       </div>
     )
-  }
-
-  if (!session) {
-    return <LoginPage onSignIn={signInWithGoogle} />
   }
 
   const handleOpenGearCloset = (category) => {
@@ -68,7 +67,7 @@ export default function App() {
       case 'closet':
         return <AllGearClosetPage onOpenCloset={handleOpenGearCloset} />
       case 'settings':
-        return <SettingsPage session={session} settings={settings} onSettingsChange={setSettings} onSignOut={signOut} />
+        return <SettingsPage settings={settings} onSettingsChange={setSettings} />
       default:
         return <LogPage settings={settings} prefill={logPrefill} onPrefillConsumed={() => setLogPrefill(null)} />
     }
@@ -76,11 +75,6 @@ export default function App() {
 
   return (
     <>
-      {!isOnline && (
-        <div className="offline-pill">
-          <span>●</span> Offline — changes saved locally
-        </div>
-      )}
       {renderPage()}
       {!gearClosetCategory && (
         <>

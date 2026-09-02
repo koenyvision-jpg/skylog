@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTemplates, addTemplate, deleteTemplate, upsertSettings, getJumps, getGearItems, getGearSwaps, clearAllJumps } from '../lib/db'
-import { exportToGoogleDrive, getLastBackupDate } from '../lib/driveBackup'
+import { getGithubConfig, setGithubConfig, getBackupStatus, backupNow, restoreFromGithub } from '../lib/githubBackup'
 import AIImport from '../components/AIImport'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'AUD']
@@ -85,15 +85,19 @@ function TemplateManager({ category, label }) {
   )
 }
 
-export default function SettingsPage({ session, settings, onSettingsChange, onSignOut }) {
+export default function SettingsPage({ settings, onSettingsChange }) {
   const [local, setLocal] = useState(settings || {})
-  const [backupLoading, setBackupLoading] = useState(false)
-  const [backupMsg, setBackupMsg] = useState(null)
-  const [lastBackup, setLastBackup] = useState(getLastBackupDate())
   const [showImport, setShowImport] = useState(false)
   const [clearConfirm, setClearConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
   const saveTimeout = useRef(null)
+
+  const [githubForm, setGithubForm] = useState(getGithubConfig())
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [backupMsg, setBackupMsg] = useState(null)
+  const [backupStatus, setBackupStatus] = useState(getBackupStatus())
+  const [restoreLoading, setRestoreLoading] = useState(false)
+  const [restoreMsg, setRestoreMsg] = useState(null)
 
   useEffect(() => { if (settings) setLocal(settings) }, [settings])
 
@@ -107,17 +111,41 @@ export default function SettingsPage({ session, settings, onSettingsChange, onSi
     }, 500)
   }
 
-  const handleBackup = async () => {
+  const handleGithubFieldChange = (key, value) => {
+    const updated = { ...githubForm, [key]: value }
+    setGithubForm(updated)
+    setGithubConfig({ [key]: value })
+  }
+
+  const handleBackupNow = async () => {
     setBackupLoading(true)
     setBackupMsg(null)
     try {
-      const filename = await exportToGoogleDrive()
-      setBackupMsg(`✓ Backed up as ${filename}`)
-      setLastBackup(new Date().toISOString())
+      await backupNow()
+      setBackupMsg('✓ Backed up to GitHub')
+      setBackupStatus(getBackupStatus())
     } catch (err) {
       setBackupMsg(`Error: ${err.message}`)
     }
     setBackupLoading(false)
+  }
+
+  const handleRestore = async () => {
+    if (!confirm('This overwrites everything on this device with the latest GitHub backup. Continue?')) return
+    setRestoreLoading(true)
+    setRestoreMsg(null)
+    try {
+      const data = await restoreFromGithub()
+      if (!data) {
+        setRestoreMsg('No backup file found in that repo yet.')
+      } else {
+        setRestoreMsg(`✓ Restored ${data.jumps?.length || 0} jumps, ${data.gear_items?.length || 0} gear items`)
+        onSettingsChange(data.settings || null)
+      }
+    } catch (err) {
+      setRestoreMsg(`Error: ${err.message}`)
+    }
+    setRestoreLoading(false)
   }
 
   const handleExportCSV = async () => {
@@ -152,25 +180,9 @@ export default function SettingsPage({ session, settings, onSettingsChange, onSi
     } catch (err) { alert(err.message) }
   }
 
-  const meta = session?.user?.user_metadata || {}
-
   return (
     <div className="page" style={{ paddingTop: 24 }}>
       <h1 className="page-title" style={{ padding: '0 var(--page-px)', marginBottom: 4 }}>Settings</h1>
-
-      {/* Account */}
-      <SectionCard title="Account">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {meta.avatar_url && (
-            <img src={meta.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
-          )}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>{meta.full_name || meta.name || 'Skydiver'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{session?.user?.email}</div>
-          </div>
-          <button className="btn-secondary btn-danger" style={{ padding: '8px 14px', fontSize: 13 }} onClick={onSignOut}>Sign Out</button>
-        </div>
-      </SectionCard>
 
       {/* General */}
       <SectionCard title="General Preferences">
@@ -257,20 +269,54 @@ export default function SettingsPage({ session, settings, onSettingsChange, onSi
         )}
       </SectionCard>
 
-      {/* Backup */}
-      <SectionCard title="Backup to Google Drive">
-        {lastBackup && (
-          <p style={{ fontSize: 12 }}>Last backup: {new Date(lastBackup).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+      {/* GitHub Backup */}
+      <SectionCard title="Auto-Backup to GitHub">
+        <p style={{ fontSize: 13 }}>
+          Your logbook lives on this device. After every change, a snapshot is committed to a GitHub repo of your choosing — so nothing depends on any server staying up.
+        </p>
+        <SettingRow label="Repo Owner">
+          <input className="input-field" style={{ width: 160, padding: '8px 12px' }} value={githubForm.owner || ''} onChange={e => handleGithubFieldChange('owner', e.target.value)} placeholder="username" />
+        </SettingRow>
+        <div className="divider" />
+        <SettingRow label="Repo Name">
+          <input className="input-field" style={{ width: 160, padding: '8px 12px' }} value={githubForm.repo || ''} onChange={e => handleGithubFieldChange('repo', e.target.value)} placeholder="skylog" />
+        </SettingRow>
+        <div className="divider" />
+        <SettingRow label="Branch">
+          <input className="input-field" style={{ width: 160, padding: '8px 12px' }} value={githubForm.branch || 'main'} onChange={e => handleGithubFieldChange('branch', e.target.value)} placeholder="main" />
+        </SettingRow>
+        <div className="divider" />
+        <SettingRow label="Personal Access Token" description="Fine-grained token, scoped to this repo, Contents: Read & write only">
+          <input type="password" className="input-field" style={{ width: 160, padding: '8px 12px' }} value={githubForm.token || ''} onChange={e => handleGithubFieldChange('token', e.target.value)} placeholder="github_pat_..." />
+        </SettingRow>
+        {backupStatus.lastBackupAt && (
+          <p style={{ fontSize: 12 }}>Last backup: {new Date(backupStatus.lastBackupAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+        )}
+        {backupStatus.lastError && !backupMsg && (
+          <div className="badge badge-danger" style={{ borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: 13 }}>
+            Last attempt failed: {backupStatus.lastError}
+          </div>
         )}
         {backupMsg && (
           <div className={`badge badge-${backupMsg.startsWith('Error') ? 'danger' : 'success'}`} style={{ borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: 13 }}>
             {backupMsg}
           </div>
         )}
-        <button className="btn-secondary" style={{ width: '100%' }} onClick={handleBackup} disabled={backupLoading}>
-          {backupLoading ? '⏳ Exporting...' : '☁️ Export backup to Google Drive'}
+        <button className="btn-secondary" style={{ width: '100%' }} onClick={handleBackupNow} disabled={backupLoading}>
+          {backupLoading ? '⏳ Backing up...' : '☁️ Back up now'}
         </button>
-        <p style={{ fontSize: 12 }}>Creates or updates SkyLog_Backup_YYYY-MM-DD.json in your Google Drive root.</p>
+        <div className="divider" />
+        <p style={{ fontSize: 13 }}>
+          Setting this up on a new device? Enter the same repo/token above, then restore the latest backup down to this device.
+        </p>
+        {restoreMsg && (
+          <div className={`badge badge-${restoreMsg.startsWith('Error') ? 'danger' : 'success'}`} style={{ borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: 13 }}>
+            {restoreMsg}
+          </div>
+        )}
+        <button className="btn-secondary" style={{ width: '100%' }} onClick={handleRestore} disabled={restoreLoading}>
+          {restoreLoading ? '⏳ Restoring...' : '⬇️ Restore latest backup to this device'}
+        </button>
       </SectionCard>
 
       {/* Export */}

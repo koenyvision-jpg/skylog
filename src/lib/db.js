@@ -1,163 +1,121 @@
-import { supabase } from './supabase'
+import { KEYS, readAll, writeAll } from './storageKeys'
+import { scheduleBackup } from './githubBackup'
 
-const QUEUE_KEY = 'skylog_offline_queue'
-
-function enqueue(op) {
-  const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]')
-  q.push(op)
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(q))
+function uid() {
+  return crypto.randomUUID()
 }
 
-export async function flushQueue() {
-  const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]')
-  if (!q.length) return
-  const remaining = []
-  for (const op of q) {
-    try {
-      await replayOp(op)
-    } catch {
-      remaining.push(op)
-    }
-  }
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(remaining))
+function getCollection(key) {
+  return readAll(key) || []
 }
 
-async function replayOp(op) {
-  const { table, method, data, id } = op
-  if (method === 'insert') {
-    const { error } = await supabase.from(table).insert(data)
-    if (error) throw error
-  } else if (method === 'update') {
-    const { error } = await supabase.from(table).update(data).eq('id', id)
-    if (error) throw error
-  } else if (method === 'delete') {
-    const { error } = await supabase.from(table).delete().eq('id', id)
-    if (error) throw error
-  } else if (method === 'upsert') {
-    const { error } = await supabase.from(table).upsert(data)
-    if (error) throw error
-  }
-}
-
-async function writeOrQueue(table, method, data, id) {
-  try {
-    await replayOp({ table, method, data, id })
-  } catch {
-    enqueue({ table, method, data, id })
-    throw new Error('offline')
-  }
+function saveCollection(key, arr) {
+  writeAll(key, arr)
+  scheduleBackup()
 }
 
 // ── Jumps ──────────────────────────────────────────────────────────────────
 
 export async function getJumps({ page = 0, limit = 50, filters = {} } = {}) {
-  let q = supabase
-    .from('jumps')
-    .select('*')
-    .order('date', { ascending: false })
-    .order('jump_number_start', { ascending: false })
-    .range(page * limit, page * limit + limit - 1)
+  let jumps = getCollection(KEYS.jumps)
 
-  if (filters.dateFrom) q = q.gte('date', filters.dateFrom)
-  if (filters.dateTo)   q = q.lte('date', filters.dateTo)
-  if (filters.jumpType) q = q.eq('jump_type', filters.jumpType)
-  if (filters.location) q = q.ilike('location', `%${filters.location}%`)
+  if (filters.dateFrom) jumps = jumps.filter(j => j.date >= filters.dateFrom)
+  if (filters.dateTo) jumps = jumps.filter(j => j.date <= filters.dateTo)
+  if (filters.jumpType) jumps = jumps.filter(j => j.jump_type === filters.jumpType)
+  if (filters.location) jumps = jumps.filter(j => (j.location || '').toLowerCase().includes(filters.location.toLowerCase()))
 
-  const { data, error } = await q
-  if (error) throw error
-  return data
+  jumps.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1
+    return (b.jump_number_start || 0) - (a.jump_number_start || 0)
+  })
+
+  return jumps.slice(page * limit, page * limit + limit)
 }
 
 export async function getAllJumpsForStats() {
-  const { data, error } = await supabase
-    .from('jumps')
-    .select('date, jump_number_start, jump_number_end, number_of_jumps, gear_snapshot')
-    .order('date', { ascending: true })
-  if (error) throw error
-  return data
+  const jumps = getCollection(KEYS.jumps)
+    .map(({ date, jump_number_start, jump_number_end, number_of_jumps, gear_snapshot }) => ({
+      date, jump_number_start, jump_number_end, number_of_jumps, gear_snapshot,
+    }))
+  jumps.sort((a, b) => (a.date > b.date ? 1 : -1))
+  return jumps
 }
 
 export async function insertJump(jump) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const payload = { ...jump, user_id: session.user.id }
-  await writeOrQueue('jumps', 'insert', payload)
+  const jumps = getCollection(KEYS.jumps)
+  jumps.push({ id: uid(), created_at: new Date().toISOString(), ...jump })
+  saveCollection(KEYS.jumps, jumps)
 }
 
 export async function updateJump(id, data) {
-  await writeOrQueue('jumps', 'update', data, id)
+  const jumps = getCollection(KEYS.jumps)
+  const idx = jumps.findIndex(j => j.id === id)
+  if (idx === -1) return
+  jumps[idx] = { ...jumps[idx], ...data }
+  saveCollection(KEYS.jumps, jumps)
 }
 
 export async function deleteJump(id) {
-  await writeOrQueue('jumps', 'delete', null, id)
+  const jumps = getCollection(KEYS.jumps).filter(j => j.id !== id)
+  saveCollection(KEYS.jumps, jumps)
 }
 
 export async function getNextJumpNumber(startingJumpNumber = 1) {
-  const { data, error } = await supabase
-    .from('jumps')
-    .select('jump_number_end')
-    .order('jump_number_end', { ascending: false })
-    .limit(1)
-  if (error) throw error
-  if (!data || data.length === 0) return startingJumpNumber
-  return data[0].jump_number_end + 1
+  const jumps = getCollection(KEYS.jumps)
+  if (!jumps.length) return startingJumpNumber
+  const max = jumps.reduce((m, j) => Math.max(m, j.jump_number_end || 0), 0)
+  return max + 1
 }
 
 // ── Gear ───────────────────────────────────────────────────────────────────
 
 export async function getGearItems(category) {
-  let q = supabase.from('gear_items').select('*').order('created_at', { ascending: false })
-  if (category) q = q.eq('category', category)
-  const { data, error } = await q
-  if (error) throw error
-  return data
+  let items = getCollection(KEYS.gearItems)
+  if (category) items = items.filter(i => i.category === category)
+  return [...items].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
 }
 
 export async function insertGearItem(item) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const payload = { ...item, user_id: session.user.id }
-  await writeOrQueue('gear_items', 'insert', payload)
+  const items = getCollection(KEYS.gearItems)
+  items.push({ id: uid(), created_at: new Date().toISOString(), ...item })
+  saveCollection(KEYS.gearItems, items)
 }
 
 export async function updateGearItem(id, data) {
-  await writeOrQueue('gear_items', 'update', data, id)
+  const items = getCollection(KEYS.gearItems)
+  const idx = items.findIndex(i => i.id === id)
+  if (idx === -1) return
+  items[idx] = { ...items[idx], ...data }
+  saveCollection(KEYS.gearItems, items)
 }
 
 export async function retireGearItem(id, reason, salePrice) {
-  const data = {
+  await updateGearItem(id, {
     is_active: false,
     retired_date: new Date().toISOString().split('T')[0],
     retired_reason: reason,
     sale_price: salePrice || null,
-  }
-  await writeOrQueue('gear_items', 'update', data, id)
+  })
 }
 
 export async function setActiveGear(category, newId, jumpNumber) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const userId = session.user.id
+  const items = getCollection(KEYS.gearItems)
+  const swaps = getCollection(KEYS.gearSwaps)
+  const current = items.find(i => i.category === category && i.is_active)
 
-  // Deactivate current active item and record swap
-  const { data: current } = await supabase
-    .from('gear_items')
-    .select('id')
-    .eq('category', category)
-    .eq('is_active', true)
-    .eq('user_id', userId)
-
-  if (current && current.length > 0) {
-    const oldId = current[0].id
-    await supabase.from('gear_items').update({ is_active: false }).eq('id', oldId)
-    await supabase.from('gear_swaps').insert({
-      user_id: userId,
+  if (current) {
+    current.is_active = false
+    swaps.push({
+      id: uid(),
       category,
-      old_gear_id: oldId,
+      old_gear_id: current.id,
       new_gear_id: newId,
       swapped_at: new Date().toISOString(),
       jump_number_at_swap: jumpNumber,
     })
   } else {
-    await supabase.from('gear_swaps').insert({
-      user_id: userId,
+    swaps.push({
+      id: uid(),
       category,
       old_gear_id: null,
       new_gear_id: newId,
@@ -166,45 +124,39 @@ export async function setActiveGear(category, newId, jumpNumber) {
     })
   }
 
-  await supabase.from('gear_items').update({ is_active: true }).eq('id', newId)
+  const newIdx = items.findIndex(i => i.id === newId)
+  if (newIdx !== -1) items[newIdx].is_active = true
+
+  writeAll(KEYS.gearItems, items)
+  writeAll(KEYS.gearSwaps, swaps)
+  scheduleBackup()
 }
 
 export async function setActiveRig(rigId, jumpNumber) {
-  const { data: rigRow, error } = await supabase
-    .from('gear_items')
-    .select('data')
-    .eq('id', rigId)
-    .single()
-  if (error) throw error
-
-  const { main_canopy_id, reserve_id, aad_id } = rigRow.data || {}
+  const items = getCollection(KEYS.gearItems)
+  const rig = items.find(i => i.id === rigId)
+  const { main_canopy_id, reserve_id, aad_id } = rig?.data || {}
 
   await setActiveGear('rig', rigId, jumpNumber)
 
   if (main_canopy_id) {
     await setActiveGear('main_canopy', main_canopy_id, jumpNumber)
-    const { data: canopy } = await supabase.from('gear_items').select('data').eq('id', main_canopy_id).single()
+    const canopy = getCollection(KEYS.gearItems).find(i => i.id === main_canopy_id)
     if (canopy?.data?.lineset_id) {
       await setActiveGear('lineset', canopy.data.lineset_id, jumpNumber)
     }
   }
   if (reserve_id) await setActiveGear('reserve', reserve_id, jumpNumber)
-  if (aad_id)     await setActiveGear('aad', aad_id, jumpNumber)
+  if (aad_id) await setActiveGear('aad', aad_id, jumpNumber)
 }
 
 // ── Gear Swaps ─────────────────────────────────────────────────────────────
 
 export async function getGearSwaps() {
-  const { data, error } = await supabase
-    .from('gear_swaps')
-    .select('*')
-    .order('swapped_at', { ascending: true })
-  if (error) throw error
-  return data
+  return [...getCollection(KEYS.gearSwaps)].sort((a, b) => (a.swapped_at > b.swapped_at ? 1 : -1))
 }
 
 export async function getJumpsOnGearItem(gearId, allJumps, allSwaps) {
-  // Find activation date (when this gear became active)
   const activations = allSwaps
     .filter(s => s.new_gear_id === gearId)
     .sort((a, b) => new Date(a.swapped_at) - new Date(b.swapped_at))
@@ -213,7 +165,6 @@ export async function getJumpsOnGearItem(gearId, allJumps, allSwaps) {
 
   const activatedAt = new Date(activations[0].swapped_at)
 
-  // Find retirement date (when this gear was deactivated)
   const retirements = allSwaps
     .filter(s => s.old_gear_id === gearId)
     .sort((a, b) => new Date(a.swapped_at) - new Date(b.swapped_at))
@@ -233,59 +184,45 @@ export async function getJumpsOnGearItem(gearId, allJumps, allSwaps) {
 // ── Templates ──────────────────────────────────────────────────────────────
 
 export async function getTemplates(category) {
-  const { data, error } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('category', category)
-    .order('value', { ascending: true })
-  if (error) throw error
-  return data
+  return getCollection(KEYS.templates)
+    .filter(t => t.category === category)
+    .sort((a, b) => (a.value > b.value ? 1 : -1))
 }
 
 export async function addTemplate(category, value) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const { data, error } = await supabase
-    .from('templates')
-    .insert({ user_id: session.user.id, category, value })
-    .select()
-    .single()
-  if (error) throw error
-  return data
+  const templates = getCollection(KEYS.templates)
+  const item = { id: uid(), category, value }
+  templates.push(item)
+  saveCollection(KEYS.templates, templates)
+  return item
 }
 
 export async function deleteTemplate(id) {
-  const { error } = await supabase.from('templates').delete().eq('id', id)
-  if (error) throw error
+  const templates = getCollection(KEYS.templates).filter(t => t.id !== id)
+  saveCollection(KEYS.templates, templates)
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
 export async function getSettings() {
-  const { data, error } = await supabase
-    .from('settings')
-    .select('*')
-    .single()
-  if (error && error.code !== 'PGRST116') throw error
-  return data
+  return readAll(KEYS.settings)
 }
 
 export async function upsertSettings(settings) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const payload = { ...settings, user_id: session.user.id, updated_at: new Date().toISOString() }
-  await writeOrQueue('settings', 'upsert', payload)
+  const current = readAll(KEYS.settings) || {}
+  const updated = { ...current, ...settings, updated_at: new Date().toISOString() }
+  writeAll(KEYS.settings, updated)
+  scheduleBackup()
 }
 
 // ── Bulk insert for AI import ───────────────────────────────────────────────
 
 export async function clearAllJumps() {
-  const { data: { session } } = await supabase.auth.getSession()
-  const { error } = await supabase.from('jumps').delete().eq('user_id', session.user.id)
-  if (error) throw error
+  saveCollection(KEYS.jumps, [])
 }
 
 export async function bulkInsertJumps(jumps) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const payload = jumps.map(j => ({ ...j, user_id: session.user.id }))
-  const { error } = await supabase.from('jumps').insert(payload)
-  if (error) throw error
+  const existing = getCollection(KEYS.jumps)
+  const withIds = jumps.map(j => ({ id: uid(), created_at: new Date().toISOString(), ...j }))
+  saveCollection(KEYS.jumps, [...existing, ...withIds])
 }

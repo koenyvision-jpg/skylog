@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-09-06T16:32:39.377Z",
+  "exportedAt": "2026-09-06T16:33:49.065Z",
   "jumps": [
     {
       "id": "2b36bda7-ea54-499e-bbf6-7005408edfc8",
@@ -1400,6 +1400,66 @@
         "linesetLabel": "Test lineset 1"
       },
       "per_jump_notes": {}
+    },
+    {
+      "id": "d16f02b0-8df7-46c1-8f92-53a9e27456ad",
+      "created_at": "2026-09-06T16:33:02.359Z",
+      "date": "2026-07-20",
+      "jump_number_start": 1385,
+      "jump_number_end": 1387,
+      "number_of_jumps": 3,
+      "location": "Norway",
+      "event_name": "Innhopp",
+      "jump_type": "FF Outside video",
+      "notes": null,
+      "altitude": 14000,
+      "gear_snapshot": {
+        "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
+        "mainCanopyLabel": "Sabre 2 107",
+        "linesetId": "1287198c-2b11-43d7-80c2-b6bb8cf0f2cb",
+        "linesetLabel": "Test lineset 1"
+      },
+      "per_jump_notes": {}
+    },
+    {
+      "id": "003b1edf-5b40-487e-a332-17ee25d367f5",
+      "created_at": "2026-09-06T16:33:33.190Z",
+      "date": "2026-07-22",
+      "jump_number_start": 1388,
+      "jump_number_end": 1389,
+      "number_of_jumps": 2,
+      "location": "Norway",
+      "event_name": "Innhopp",
+      "jump_type": "FF Outside video",
+      "notes": null,
+      "altitude": 14000,
+      "gear_snapshot": {
+        "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
+        "mainCanopyLabel": "Sabre 2 107",
+        "linesetId": "1287198c-2b11-43d7-80c2-b6bb8cf0f2cb",
+        "linesetLabel": "Test lineset 1"
+      },
+      "per_jump_notes": {}
+    },
+    {
+      "id": "61992118-8200-4f2b-a18a-743fb28964eb",
+      "created_at": "2026-09-06T16:33:46.138Z",
+      "date": "2026-07-23",
+      "jump_number_start": 1390,
+      "jump_number_end": 1390,
+      "number_of_jumps": 1,
+      "location": "Norway",
+      "event_name": "Innhopp",
+      "jump_type": "FF Outside video",
+      "notes": null,
+      "altitude": 14000,
+      "gear_snapshot": {
+        "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
+        "mainCanopyLabel": "Sabre 2 107",
+        "linesetId": "1287198c-2b11-43d7-80c2-b6bb8cf0f2cb",
+        "linesetLabel": "Test lineset 1"
+      },
+      "per_jump_notes": {}
     }
   ],
   "gear_items": [
@@ -1759,6 +1819,11 @@
       "id": "0418f9e0-dafb-4f0c-ae17-bbd6e3dd2f08",
       "category": "location",
       "value": "Norway"
+    },
+    {
+      "id": "421adfc0-0a94-4fea-921a-6cfbc43cec42",
+      "category": "event_name",
+      "value": "Innhopp"
     }
   ],
   "settings": {

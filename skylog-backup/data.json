@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-09-06T16:37:54.532Z",
+  "exportedAt": "2026-09-06T16:45:24.013Z",
   "jumps": [
     {
       "id": "2b36bda7-ea54-499e-bbf6-7005408edfc8",
@@ -1522,17 +1522,17 @@
       "per_jump_notes": {}
     },
     {
-      "id": "81e46d7e-47bf-4824-81d4-fb1e773a6960",
-      "created_at": "2026-09-06T16:37:51.677Z",
-      "date": "2026-08-14",
+      "id": "e82ee23d-eeb9-4ae8-9851-b740eaa72cec",
+      "created_at": "2026-09-06T16:45:20.480Z",
+      "date": "2026-09-01",
       "jump_number_start": 1396,
-      "jump_number_end": 1396,
-      "number_of_jumps": 1,
-      "location": "Texel",
+      "jump_number_end": 1401,
+      "number_of_jumps": 6,
+      "location": "Castellón",
       "event_name": null,
-      "jump_type": "FF",
-      "notes": "Anabel",
-      "altitude": 13000,
+      "jump_type": "FF Outside video",
+      "notes": "Ben",
+      "altitude": 13500,
       "gear_snapshot": {
         "mainCanopyId": "5c9c58b5-ecfc-46a5-97a7-fcad4c738dd7",
         "mainCanopyLabel": "Sabre 2 107",

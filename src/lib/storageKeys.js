@@ -4,6 +4,8 @@ export const KEYS = {
   gearSwaps: 'skylog_gear_swaps',
   templates: 'skylog_templates',
   settings: 'skylog_settings',
+  // Device-only: never included in the GitHub backup or exports.
+  anthropicApiKey: 'skylog_anthropic_api_key',
 }
 
 export function readAll(key) {

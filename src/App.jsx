@@ -10,14 +10,12 @@ import GearCloset from './pages/GearCloset'
 import AllGearClosetPage from './pages/AllGearClosetPage'
 import SettingsPage from './pages/SettingsPage'
 import BottomNav from './components/BottomNav'
-import AIAssistant from './components/AIAssistant'
 
 export default function App() {
   const [ready, setReady] = useState(false)
   const [activeTab, setActiveTab] = useState('log')
   const [gearClosetCategory, setGearClosetCategory] = useState(null)
   const [settings, setSettings] = useState(null)
-  const [logPrefill, setLogPrefill] = useState(null)
   const { alerts, criticalCount } = useAlerts(settings)
 
   useEffect(() => {
@@ -48,18 +46,13 @@ export default function App() {
     setGearClosetCategory(null)
   }
 
-  const handleAILogPrefill = (data) => {
-    setLogPrefill(data)
-    setActiveTab('log')
-  }
-
   const renderPage = () => {
     if (gearClosetCategory) {
       return <GearCloset category={gearClosetCategory} onBack={handleCloseGearCloset} settings={settings} />
     }
     switch (activeTab) {
       case 'log':
-        return <LogPage settings={settings} prefill={logPrefill} onPrefillConsumed={() => setLogPrefill(null)} />
+        return <LogPage settings={settings} />
       case 'logbook':
         return <LogbookPage settings={settings} />
       case 'gear':
@@ -69,7 +62,7 @@ export default function App() {
       case 'settings':
         return <SettingsPage settings={settings} onSettingsChange={setSettings} />
       default:
-        return <LogPage settings={settings} prefill={logPrefill} onPrefillConsumed={() => setLogPrefill(null)} />
+        return <LogPage settings={settings} />
     }
   }
 
@@ -77,17 +70,11 @@ export default function App() {
     <>
       {renderPage()}
       {!gearClosetCategory && (
-        <>
-          <BottomNav
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            alertCount={criticalCount}
-          />
-          <AIAssistant
-            settings={settings}
-            onLogPrefill={handleAILogPrefill}
-          />
-        </>
+        <BottomNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          alertCount={criticalCount}
+        />
       )}
     </>
   )

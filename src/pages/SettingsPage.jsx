@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTemplates, addTemplate, deleteTemplate, upsertSettings, getJumps, getGearItems, getGearSwaps, clearAllJumps } from '../lib/db'
 import { getGithubConfig, setGithubConfig, getBackupStatus, backupNow, restoreFromGithub } from '../lib/githubBackup'
+import { getAnthropicApiKey, setAnthropicApiKey } from '../lib/claude'
 import AIImport from '../components/AIImport'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'AUD']
@@ -98,6 +99,7 @@ export default function SettingsPage({ settings, onSettingsChange }) {
   const [backupStatus, setBackupStatus] = useState(getBackupStatus())
   const [restoreLoading, setRestoreLoading] = useState(false)
   const [restoreMsg, setRestoreMsg] = useState(null)
+  const [apiKey, setApiKey] = useState(getAnthropicApiKey())
 
   useEffect(() => { if (settings) setLocal(settings) }, [settings])
 
@@ -115,6 +117,11 @@ export default function SettingsPage({ settings, onSettingsChange }) {
     const updated = { ...githubForm, [key]: value }
     setGithubForm(updated)
     setGithubConfig({ [key]: value })
+  }
+
+  const handleApiKeyChange = (value) => {
+    setApiKey(value)
+    setAnthropicApiKey(value)
   }
 
   const handleBackupNow = async () => {
@@ -253,6 +260,25 @@ export default function SettingsPage({ settings, onSettingsChange }) {
         <TemplateManager category="jump_type" label="Jump Types" />
         <div className="divider" />
         <TemplateManager category="event_name" label="Event Names" />
+      </SectionCard>
+
+      {/* AI Import key */}
+      <SectionCard title="AI Import">
+        <p style={{ fontSize: 13 }}>
+          The logbook import below uses your own Anthropic API key. It is stored only on this device — never in the app, the GitHub backup, or exports.
+        </p>
+        <SettingRow label="Anthropic API Key" description="Get one at console.anthropic.com">
+          <input type="password" autoComplete="off" className="input-field" style={{ width: 160, padding: '8px 12px' }} value={apiKey} onChange={e => handleApiKeyChange(e.target.value)} placeholder="Paste your key" />
+        </SettingRow>
+        {apiKey.trim() ? (
+          <button className="btn-secondary" style={{ width: '100%' }} onClick={() => handleApiKeyChange('')}>
+            Remove key from this device
+          </button>
+        ) : (
+          <div className="badge badge-warning" style={{ borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: 13 }}>
+            No key set — AI import is off.
+          </div>
+        )}
       </SectionCard>
 
       {/* Import */}

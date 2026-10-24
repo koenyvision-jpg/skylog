@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
-import { askClaude } from '../lib/claude'
+import { askClaude, hasAnthropicApiKey } from '../lib/claude'
 import { bulkInsertJumps, upsertSettings } from '../lib/db'
 
 const IMPORT_PROMPT = `You are parsing a skydiving logbook export spreadsheet.
@@ -223,6 +223,14 @@ export default function AIImport({ settings, onImported }) {
             Import {rawRows.length} Rows
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (!hasAnthropicApiKey()) {
+    return (
+      <div className="badge badge-warning" style={{ borderRadius: 'var(--radius-md)', padding: '12px', fontSize: 13, whiteSpace: 'normal', lineHeight: 1.5 }}>
+        🔑 AI import needs your Anthropic API key. Add it under AI Import above — it stays on this device only.
       </div>
     )
   }

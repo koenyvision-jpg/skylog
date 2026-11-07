@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getGearItems, getNextJumpNumber, insertJump } from '../lib/db'
 import SearchableDropdown from '../components/SearchableDropdown'
+import AltitudeWheel from '../components/AltitudeWheel'
+import { defaultAltitude } from '../lib/altitude'
 
 function today() {
   return new Date().toISOString().split('T')[0]
@@ -13,7 +15,8 @@ export default function LogPage({ settings, prefill, onPrefillConsumed }) {
   const [eventName, setEventName] = useState('')
   const [jumpType, setJumpType] = useState('')
   const [notes, setNotes] = useState('')
-  const [altitude, setAltitude] = useState('')
+  const altitudeUnit = settings?.altitude_unit || 'ft'
+  const [altitude, setAltitude] = useState(() => defaultAltitude(altitudeUnit))
   const [activeGear, setActiveGear] = useState({ main: null, lineset: null })
   const [nextNum, setNextNum] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -34,6 +37,7 @@ export default function LogPage({ settings, prefill, onPrefillConsumed }) {
   }, [settings])
 
   useEffect(() => { loadState() }, [loadState])
+  useEffect(() => { setAltitude(defaultAltitude(altitudeUnit)) }, [altitudeUnit])
 
   useEffect(() => {
     if (prefill) {
@@ -87,7 +91,7 @@ export default function LogPage({ settings, prefill, onPrefillConsumed }) {
         event_name: eventName || null,
         jump_type: jumpType,
         notes: notes || null,
-        altitude: altitude ? Number(altitude) : null,
+        altitude,
         gear_snapshot: gearSnapshot,
         per_jump_notes: {},
       })
@@ -95,7 +99,7 @@ export default function LogPage({ settings, prefill, onPrefillConsumed }) {
       showToast(`✓ Logged ${numJumps} jump${numJumps > 1 ? 's' : ''} (#${jumpStart}–#${jumpEnd})`)
       setNumJumps(1)
       setNotes('')
-      setAltitude('')
+      setAltitude(defaultAltitude(altitudeUnit))
       setErrors({})
       // Refresh jump number
       const newNum = await getNextJumpNumber(settings?.starting_jump_number ?? 1)
@@ -105,7 +109,7 @@ export default function LogPage({ settings, prefill, onPrefillConsumed }) {
         showToast('Saved locally — will sync when online')
         setNumJumps(1)
         setNotes('')
-        setAltitude('')
+        setAltitude(defaultAltitude(altitudeUnit))
         setErrors({})
       } else {
         showToast('Error logging jumps')
@@ -221,15 +225,8 @@ export default function LogPage({ settings, prefill, onPrefillConsumed }) {
           />
         </div>
         <div className="form-group" style={{ width: 90 }}>
-          <label className="input-label">Alt ({settings?.altitude_unit || 'ft'})</label>
-          <input
-            type="number"
-            className="input-field"
-            placeholder={settings?.altitude_unit === 'm' ? '4000' : '13500'}
-            value={altitude}
-            onChange={e => setAltitude(e.target.value)}
-            style={{ height: '100%', minHeight: 80 }}
-          />
+          <label className="input-label">Alt ({altitudeUnit})</label>
+          <AltitudeWheel value={altitude} onChange={setAltitude} unit={altitudeUnit} />
         </div>
       </div>
 

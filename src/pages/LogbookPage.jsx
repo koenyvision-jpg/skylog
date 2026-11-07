@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getJumps, getAllJumpsForStats, getGearItems, getGearSwaps, getJumpsOnGearItem, updateJump, deleteJump } from '../lib/db'
 import StatsBar from '../components/StatsBar'
+import MonthCalendar from '../components/MonthCalendar'
 
 function formatDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -176,6 +177,8 @@ export default function LogbookPage({ settings }) {
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState([])
+  const [allJumps, setAllJumps] = useState([])
+  const [view, setView] = useState('list')
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', jumpType: '', location: '' })
   const [showFilters, setShowFilters] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -191,6 +194,7 @@ export default function LogbookPage({ settings }) {
         getGearItems(),
         getGearSwaps(),
       ])
+      setAllJumps(allJumps)
       const seasonMonth = settings?.season_start_month ?? 1
       const now = new Date()
       const seasonStart = new Date(now.getFullYear(), seasonMonth - 1, 1)
@@ -242,7 +246,7 @@ export default function LogbookPage({ settings }) {
     }, { threshold: 0.1 })
     observerRef.current.observe(sentinelRef.current)
     return () => observerRef.current?.disconnect()
-  }, [hasMore, loading, page, loadJumps])
+  }, [hasMore, loading, page, loadJumps, view])
 
   const handleUpdateNote = (jumpId, perJumpNotes) => {
     setJumps(prev => prev.map(j => j.id === jumpId ? { ...j, per_jump_notes: perJumpNotes } : j))
@@ -277,6 +281,12 @@ export default function LogbookPage({ settings }) {
     setDeleting(false)
   }
 
+  const handleSelectDay = (iso) => {
+    setFilters({ dateFrom: iso, dateTo: iso, jumpType: '', location: '' })
+    setShowFilters(true)
+    setView('list')
+  }
+
   const exitSelectMode = () => {
     setSelectMode(false)
     setSelectedIds(new Set())
@@ -292,6 +302,15 @@ export default function LogbookPage({ settings }) {
               <>
                 <button
                   className="btn-icon"
+                  onClick={() => setView(v => (v === 'list' ? 'calendar' : 'list'))}
+                  aria-label={view === 'list' ? 'Show calendar' : 'Show list'}
+                  style={{ background: view === 'calendar' ? 'var(--accent-subtle)' : 'var(--input-bg)', color: view === 'calendar' ? 'var(--accent)' : 'var(--text-secondary)' }}
+                >
+                  {view === 'list' ? '📅' : '☰'}
+                </button>
+                {view === 'list' && <>
+                <button
+                  className="btn-icon"
                   onClick={() => setShowFilters(f => !f)}
                   style={{ background: showFilters ? 'var(--accent-subtle)' : 'var(--input-bg)', color: showFilters ? 'var(--accent)' : 'var(--text-secondary)' }}
                 >
@@ -304,6 +323,7 @@ export default function LogbookPage({ settings }) {
                 >
                   Select
                 </button>
+                </>}
               </>
             ) : (
               <>
@@ -346,11 +366,17 @@ export default function LogbookPage({ settings }) {
 
       <StatsBar stats={stats} />
 
-      {showFilters && !selectMode && (
+      {view === 'calendar' && (
+        <div className="card" style={{ margin: '12px var(--page-px)' }}>
+          <MonthCalendar jumps={allJumps} onSelectDay={handleSelectDay} />
+        </div>
+      )}
+
+      {view === 'list' && showFilters && !selectMode && (
         <div className="card" style={{ margin: '12px var(--page-px)', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input className="input-field" type="date" style={{ flex: 1 }} value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} placeholder="From" />
-            <input className="input-field" type="date" style={{ flex: 1 }} value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} placeholder="To" />
+            <input className="input-field" type="date" style={{ flex: 1, minWidth: 0 }} value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} placeholder="From" />
+            <input className="input-field" type="date" style={{ flex: 1, minWidth: 0 }} value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} placeholder="To" />
           </div>
           <input className="input-field" placeholder="Filter by location..." value={filters.location} onChange={e => setFilters(f => ({ ...f, location: e.target.value }))} />
           <input className="input-field" placeholder="Filter by jump type..." value={filters.jumpType} onChange={e => setFilters(f => ({ ...f, jumpType: e.target.value }))} />
@@ -364,7 +390,7 @@ export default function LogbookPage({ settings }) {
         </p>
       )}
 
-      <div className="card" style={{ margin: '12px var(--page-px)' }}>
+      {view === 'list' && <div className="card" style={{ margin: '12px var(--page-px)' }}>
         {jumps.length === 0 && !loading ? (
           <div className="empty-state">
             <span className="empty-state-icon">📖</span>
@@ -390,7 +416,7 @@ export default function LogbookPage({ settings }) {
           </div>
         )}
         <div ref={sentinelRef} style={{ height: 1 }} />
-      </div>
+      </div>}
     </div>
   )
 }
